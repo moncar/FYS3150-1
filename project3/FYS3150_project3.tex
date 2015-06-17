@@ -1,0 +1,321 @@
+\documentclass[11 pt, a4 paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage[pdftex]{graphicx}
+\usepackage{scrextend}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{siunitx}
+
+\newenvironment{tabbed}{\begin{addmargin}{0.1cm}}{\end{addmargin}}
+\newcommand{\sectiontitle}[1]{\begin{center} \Large\textbf{{#1}} \end{center}}
+\newcommand{\sectionundertitle}[1]{\hspace{-0.5cm} \textbf{{#1}}}
+\newcommand{\vsp}{\vspace{0.2cm}}
+
+\title{FYS3150 - Project 2}
+\author{Alfred Alocias Mariadason}
+\date{20.10.2014}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+    \includegraphics[scale=0.7]{drunk_system.png}
+\end{center}
+
+\newpage
+
+\sectiontitle{Introduction}
+    \begin{tabbed}
+        In this project we were tasked with building a model for the solar system, that is, develope a code for simulating the solar system. The physical law used was mainly newton's law for gravitation and the second law of motion(newtons second law). This was then solved as a second order differential equation which was then rewritten as a set of coupled first order differential equations. This set was then solved by discretizising the equations and setting up an algorithm.\vsp\\
+        The algorithm used for solving the differential equations was the fourth order Runge-Kutta method(also known as RK4) and Verlet method. Note that the Verlet method is specialized by the velocity verlet method, which assumes that the acceleration is only dependant on the position. \vsp\\
+        The programming language used for creating the celestial bodies and the solarsystem and implementing the above algorithms was C++, while the visualization(plots) is in python.\vsp\\
+        Link to programs used: \url{https://github.com/Oo1Insane1oO/project3}.
+    \end{tabbed}\vsp
+
+\sectiontitle{Theory}
+\sectionundertitle{Setting up the equations}
+    \begin{tabbed}
+        For setting up the equation we will here limit ourselves to a hypothetical solarsystem with just the Sun and Earth orbiting around it. The only force acting on the two bodies is given by Newton's gravitation law:
+        \begin{align*}
+            F_G &= G\frac{M_{sun}M_{earth}}{r^2}
+        \end{align*}
+        Here G is the graviational constant, the M's are respectivly the mass of the sun and earth and r is the distance between the two objects. Note that r is the distance between the center of the two bodies and not the distance from the surfaces. If we now use Newton's second law of motion we have that $\Sigma F = F_G = ma \Rightarrow a = \frac{F_G}{m}$, where m is the mass of the object the force is acting on(in our problem this is earth). With $a=\frac{d^2\vec{r}}{dt^2}$ we have the following second order differential equation:
+        \begin{align*}
+            \frac{d^2\vec{r}}{dt^2} &= \frac{\vec{F}_G}{M_{earth}}
+        \end{align*}
+        In order to solve this equation we can rewrite it as a set of coupled first order differential equation by using the fact that $\vec{v}=\frac{d\vec{r}}{dt}$. The set would then look like this:
+        \begin{align*}
+            \frac{d\vec{r}(t)}{dt} &= \vec{v}(t)\\
+            \frac{d\vec{v}(t)}{dt} &= \vec{a}(t,\vec{r}(t))
+        \end{align*}\vsp\\
+        We want to simulate this on a computer, which means one can easily obtain errors in the floating point operations being conducted throughout the algorithm. Writing the equations in terms of dimensionless variables can greatly reduce these errors by fixing the constants to better suitable numbers. In our problem we can see that we have the gravitational constant(which is a small number) multiplied with the mass of the sun(a big number). As mentioned one can use dimensionless variables, but because the magnitude of the distances in the solarsystem is so large calculating the distance in AU(astronomical units) and time in years is a much better approach. Since the mass of the sun is so large compared to the planets orbiting it, scaling all masses with the mass of the sun is also a good idea.\vsp\\
+        In order to fix the gravitational constant and the sun mass we can use the fact that Earth's orbit around the sun is close to circular. Using the law of force for circular motion we have the following relation:
+        \begin{align*}
+            F_G &= \frac{M_{Earth}v^2}{r} = G\frac{M_{Sun}M_{Earth}}{r^2}
+            \intertext{We know that for a circular motion the velocity is given by $\vec{v} = \frac{2\pi r}{T}$, with the above equation we then have that:}
+            v^2r &= \frac{4\pi^2 r^2}{T^2}r
+            \intertext{If we measure r in AU and time T in years the constants can be fixed as:}
+            v^2r &= GM_{Sun} = 4\pi^2AU^3/yr^2
+        \end{align*}
+        The final equation for force is then:
+        \begin{align*}
+            F_G &= G\frac{M_{Sun}M_{Earth}}{r^2} = \frac{4\pi^2M_{Earth}}{r^2}
+        \end{align*}
+    \end{tabbed}
+\sectionundertitle{Runge-Kutta-4}
+    \begin{tabbed}
+        The Runge-Kutta methods are basically a collection of different methods for solving differential equations numberically. The order indicates the precision in respect to the number of iterations needed. The higher the orden, the better the relative precision is. The first order Runge-Kutta is just Eulers method, while second order is Euler midpoint. For the fourth order methods one first calulates the value on the tangent of the slope of our function(Eulers methods), we then use the midpoint method twice to calculate the values in the middle of the slope and then we add these to a fourth value by using Eulers again. Note that after fourth order one has to jump to sixth order to gain a higher level of precision and this behaviour repeats itself for every orden higher than fourth, this is why fourth order is usually preferred over fifth.\vsp\\
+        For our problem the function we want is given by a set of coupled first order differential equations(as shown above). We need to calculate both the position and the velocity. If we set $dt=h$ and $\frac{dv}{dt}=g(t,v)$ the algorithm according to the RK4 methods is:
+        \begin{align*}
+            K_1 &= hv_k\\
+            L_1 &= hg(t_k,r_k)\\
+            K_2 &= h(v_k + L_1/2)\\
+            L_2 &= hg(t_k + h/2, r_k + K_1/2)\\
+            K_3 &= h(v_k + L_2/2)\\
+            L_3 &= hg(t_k + h/2, r_k + K_2/2)\\
+            K_4 &= h(v_k + L_3)\\
+            L_4 &= hg(t_k + h, r_k + K_3)\\
+            v_{k+1} &= (1/6)(L_1 + 2L_2 + 2L_3 + L_4)\\
+            r_{k+1} &= (1/6)(K_1 + 2K_2 + 2K_3 + K_4)
+        \end{align*}
+    \end{tabbed}
+\sectionundertitle{Verlet method}
+    \begin{tabbed}
+        Verlet algorithm is a numerical method spesifically derived to solve Newtons's law for motion. It is also part of a large collection of numerical methods known as predictor-corrector methods.\vsp\\
+        The basic approach is to compute the slope at $t_k$(again Eulers method) and use this to compute the predicted position and use this to compute the next slope. Finally we correct the predicted slope by taking the average between the two slopes giving the final value. The algorithm would then look like this:
+        \begin{align*}
+            K_1 &= f(t_k,r_k)\\
+            r_{k+1} &= r_k + hK_1\\
+            K_2 &= f(t_{k+1},r_{k+1})\\
+            r_{k+1} &= r_k + (h/2)(K_1 + K_2)
+        \end{align*}
+        Now this is the general procedure of Verlet method, however for our problem we can use the Velocity Verlet method. This method incorporates the velocity as the name suggests. One note of precaution though, Velocity Verlet assumes that the function for second derivative(the acceleration) isn't dependant on the predicted velocity and only the position. The final algorithm is basically as above, but with the added velocity:
+        \begin{align*}
+            K_1 &= \frac{h}{2}g(t_k,r_k)\\
+            r_{k+1} &= r_k + h(v_k + K_1)\\
+            K_2 &= \frac{h}{2}g(t_{k+1},r_{k+1})\\
+            v_{k+1} &= v_k + K_1 + K_2
+        \end{align*}
+        For our problem the function g is just the function for acceleration and h is the same time-step defined in the RK4-method.
+    \end{tabbed}
+\sectiontitle{Earth-Sun system}
+    \begin{tabbed}
+        For the Earth-Sun system we can assume cirular orbit, the initial velocity is then given by:
+        \begin{align*}
+            v_0 &= \frac{2\pi r}{T}
+            \intertext{Since the distance is measured in AU(and 1 AU is defined as the distance between the Earth and Sun) and time is measured in years, we can set $r=1$ and $T=1$, which gives an initial velocity(for cirular orbit) of:}
+            v_0 &= 2\pi
+        \end{align*}\vsp\\
+        Another quantity to mention is energy, that is, potential and kinetic energy. These two are both conserved in a circular motion because the radius, or the distance to the sun for the earth, is the same for the whole orbit. This means that r is constant. Because the potential energy is defined as $-G\frac{M_{sun}M_{earth}}{r}$ one can easily see that it must be conserved for cirular motion. As for the kinetic energy, defined as $\frac{1}{2}mv^2$, it is conserved because the velocity of the planet doesn't change.\vsp\\
+        The last value, that is conserved, is the angular momentum. This is also due to arguments above. Both r and v are constant values in a circular motion and the angular momentum is defined as $\vec{L}=\vec{r}\times m\vec{v}$. It is easy to see that every quantity involved are constant.\vsp\\
+        Using the program mentioned above a plot of the results for Earth-Sun system with the initial velocity above looks like this:
+    \end{tabbed}
+        \begin{figure}[H]
+            \captionsetup[subfigure]{labelformat=empty}
+            \begin{subfigure}[b!]{0.6\textwidth}
+                \centering
+                \includegraphics[width=\textwidth]{es_rk4.png}
+                \caption{Earth-Sun system with RK4}
+            \end{subfigure}
+            \begin{subfigure}[b!]{0.6\textwidth}
+                \includegraphics[width=\textwidth]{es_verlet.png}
+                \caption{Earth-Sun system with Verlet}
+            \end{subfigure}
+        \end{figure}
+    \begin{tabbed}
+        The time-step used here is $dt=0.001$. With such a low dt both methods behave correctly and are very much stable. With some experimentation it was found that RK4 seemingly acted a bit more stable for high values of dt. With a step-value of 0.05 we get these simulations:
+    \end{tabbed}
+        \begin{figure}[H]
+            \captionsetup[subfigure]{labelformat=empty}
+            \begin{subfigure}[b!]{0.6\textwidth}
+                \centering
+                \includegraphics[width=\textwidth]{es_rk4_l.png}
+                \caption{Earth-Sun system with RK4, $dt=0.05$}
+            \end{subfigure}
+            \begin{subfigure}[b!]{0.6\textwidth}
+                \includegraphics[width=\textwidth]{es_verlet_l.png}
+                \caption{Earth-Sun system with Verlet, $dt=0.05$}
+            \end{subfigure}
+        \end{figure}
+    \begin{tabbed}
+        As we can see, RK4 makes the orbit slightly more closed than RK4.
+    \end{tabbed}\vsp
+    \begin{tabbed}
+        To find out which method is the most stable we can look at the conservation of energy, with other words, check if the potential and kinetic energy are constants. We can plot the total energy of the system as a function of time:
+        \begin{figure}[H]
+            \captionsetup[subfigure]{labelformat=empty}
+            \begin{subfigure}[b!]{0.6\textwidth}
+                \centering
+                \includegraphics[width=\textwidth]{total_energy_rk4.png}
+                \caption{Total energy with RK4, $dt=0.0001$}
+            \end{subfigure}
+            \begin{subfigure}[b!]{0.6\textwidth}
+                \includegraphics[width=\textwidth]{total_energy_verlet.png}
+                \caption{Total energy with verlet, $dt=0.0001$}
+            \end{subfigure}
+        \end{figure}
+    \end{tabbed}
+    \begin{tabbed}
+        As we can see the total energy is very much constant with both methods. However, with a higher time-step we get:
+        \begin{figure}[H]
+            \captionsetup[subfigure]{labelformat=empty}
+            \begin{subfigure}[b!]{0.6\textwidth}
+                \centering
+                \includegraphics[width=\textwidth]{total_energy_rk4_l.png}
+                \caption{Total energy with RK4, $dt=0.08$}
+            \end{subfigure}
+            \begin{subfigure}[b!]{0.6\textwidth}
+                \includegraphics[width=\textwidth]{total_energy_verlet_l.png}
+                \caption{Total energy with verlet, $dt=0.08$}
+            \end{subfigure}
+        \end{figure}
+    \end{tabbed}
+    \begin{tabbed}
+        As we can see here verlet does behave rather poorly for high step-values.
+    \end{tabbed}
+
+\sectiontitle{Escape velocity}
+    \begin{tabbed}
+        Considering a planet orbiting the sun we can easily find an initial velocity that makes the planet escape from the sun, rather than orbiting it. For both an analytical and numerical approach we can use the fact that in order for one body to escape from another, the total energy of the escaping body must be less than zero, with other words, the kinetic energy must be greater than the potential energy. With this at hand we get the following equation to solve:
+        \begin{align*}
+            \frac{1}{2}M_{planet}v^2_0 &= G\frac{M_{sun}M_{Planet}}{r}\\
+            v_0 &= \sqrt{\frac{2GM_{sun}}{r}}
+        \end{align*}
+        G is still the gravitational constant and r is the distance between the two objects. Note that this velocity doesn't depend on the mass of the planet and only the distance too the sun and the suns mass. Using our sun as reference and putting a planet of distance 1AU apart we get that the initial velocity must be:
+        \begin{align*}
+            v_0 &\approx 8.89\; \mbox{au/yr} \approx 52.6\; \mbox{km/s}
+        \end{align*}
+        If we want to find the velocity numerically one can always go by trial and error. We find that the initial velocity needs to indeed be $8.9\; \mbox{au/yr}$ in order for the planet to escape.
+    \end{tabbed}
+        \begin{figure}[H]
+            \captionsetup[subfigure]{labelformat=empty}
+            \begin{subfigure}[b!]{0.6\textwidth}
+                \centering
+                \includegraphics[width=\textwidth]{escape_88.png}
+                \caption{$v_0=8.8\;\mbox{au/yr}$}
+            \end{subfigure}
+            \begin{subfigure}[b!]{0.6\textwidth}
+                \includegraphics[width=\textwidth]{escape_89.png}
+                \caption{$v_0=8.9\; \mbox{au/yr}$}
+            \end{subfigure}
+        \end{figure}
+    \begin{tabbed}
+        Note that the the total time are respectively 133 years and 300 years so it takes a long time for the orbit to complete the larger the initial velocity is. The orbit itself will also be considerably larger.
+    \end{tabbed}
+
+\sectiontitle{Three-body problem}
+    \begin{tabbed}
+        Till now we have only studied a hypothetical solar system. In reality the other planets in our solar system also affect eachother with gravitational forces. The planet which affects the Earth the most is the most massive planet in our solar system, Jupiter. With Jupiter in consideration our problem is now a three-body problem.\vsp\\
+        To accommodate for this change we can easily modify the expression for force deduced in the theory section above by just adding the gravitational force between Jupiter and Earth into the loop. This can(should and is) generalized for a number of bodies in the code. We can make a simple simulation with the sun still fixed at the center. The plot looks like this:
+    \end{tabbed}
+        \begin{figure}[H]
+            \captionsetup[subfigure]{labelformat=empty}
+            \begin{subfigure}[b!]{0.6\textwidth}
+                \centering
+                \includegraphics[width=\textwidth]{three_body_rk4.png}
+                \caption{Three-body problem rk4}
+            \end{subfigure}
+            \begin{subfigure}[b!]{0.6\textwidth}
+                \includegraphics[width=\textwidth]{three_body_verlet.png}
+                \caption{Three-body problem verlet}
+            \end{subfigure}
+        \end{figure}
+    \begin{tabbed}
+        Plot of just the Earths orbit:
+    \end{tabbed}
+        \begin{figure}[H]
+            \captionsetup[subfigure]{labelformat=empty}
+            \begin{subfigure}[b!]{0.6\textwidth}
+                \centering
+                \includegraphics[width=\textwidth]{three_body_earth_rk4.png}
+                \caption{Three-body earth rk4}
+            \end{subfigure}
+            \begin{subfigure}[b!]{0.6\textwidth}
+                \includegraphics[width=\textwidth]{three_body_earth_verlet.png}
+                \caption{Three-body earth verlet}
+            \end{subfigure}
+        \end{figure}
+    \begin{tabbed}
+        The total period is here 12 years, which is about the same as the orbital time of Jupiters orbit around the sun. As presumed Earths orbit is affected by Jupiter. It is not a circular orbit anymore, but gets a bit more "wobbly". Note that the last two figures are of earths orbit over a period of 5 years. Also note that both methods are still very mush stable with a low dt(dt is here 0.0001).\vsp\\
+        To see how much another planet(or any celestial body) affects Earth we can increase Jupiters mass and see how the orbit of changes.
+    \end{tabbed}
+        \captionsetup[figure]{labelformat=empty}
+        \begin{figure}[H]
+            \centering
+            \includegraphics[scale=0.5]{three_body_fac10_rk4.png}
+            \caption{Jupiter mass increased by factor 10}
+        \end{figure}
+        \begin{figure}[H]
+            \centering
+            \includegraphics[scale=0.5]{three_body_fac1000_rk4.png}
+            \caption{Jupiter mass increased by factor 1000}
+        \end{figure}
+    \begin{tabbed}
+        Earths orbit becomes even more wobbly and increasing Jupiters mass by a factor 1000(putting Jupiters mass equal to the suns mass) Gives a rather unstable orbital path(if we can still call it an orbit\dots). The total time for both figures is 15 years.
+    \end{tabbed}
+\sectiontitle{Real three-body simulation}
+    \begin{tabbed}
+        For all the previous calculations we have fixed the sun at the origin, assuming the center of mass is approximately in the sun's position. In reality this is not true. It is much more realistic to set the center of mass at the origin and rather give the sun an initial velocity which makes the angular momentum zero. We can do this by calculating:
+        \begin{align*}
+            \vec{L}_{\mbox{tot}} = \sum_i\vec{r}_i\times m_i\vec{v}_i &= 0\\
+            -M_{\mbox{sun}}\vec{v}_{\mbox{sun}} + \sum_{i=1}m_i\vec{v}_i &= 0\\
+            \vec{v}_{\mbox{sun}} = \frac{\sum_{i=1}m_i\vec{v}_i}{M_{\mbox{sun}}}& 
+        \end{align*}
+        Now we only need to give the other planets an initial velocity and the suns initial velocity will fall straight out. Now the figures are slightly different:
+    \end{tabbed}
+        \begin{figure}[H]
+            \centering
+            \includegraphics[scale=0.6]{real_three_body.png}
+            \caption{More realistic three-body simulation}
+        \end{figure}
+    \begin{tabbed}
+        We don't see much difference from the previous results, however if the period is increased one can easily see that the sun also moves in kind of a line. Note that the initial velocities are all only in y-direction. This is why the sun only movies in y. In reality it would actually move in a more circular motion around the center. A plot with period increased to 50 years:
+    \end{tabbed}
+        \begin{figure}[H]
+            \centering
+            \includegraphics[scale=0.6]{real_three_body_50.png}
+            \caption{Three-body simulation 50 years}
+        \end{figure}
+    \begin{tabbed}
+        As we can see the sun is also moving. Note that both of the above simulations are done with RK4.
+    \end{tabbed}
+\sectiontitle{Complete simulation of the solar system}
+    \begin{tabbed}
+        With the results we have at hand and information gained from simulating a two- and three-body problem, we can step up and simulate the whole solar system. Adding all the planets, giving them an initial velocity from known results and giving the sun an initial velocity which gives zero total angular momentum gives a plot like this.
+    \end{tabbed}
+    \begin{figure}[H]
+        \centering
+        \includegraphics[scale=0.6]{all_planets.png}
+        \caption{The whole solarsystem(ish)}
+    \end{figure}
+    \begin{tabbed}
+        Note that for this simulation we haven't taken into account the perihelion precession of Mercury. The several moons and the rocks in the asteroid belt are also ignored. The simulation itself is run for 250 years, which is about the orbital time of pluto.
+    \end{tabbed}
+\sectiontitle{Sources}
+\sectionundertitle{Theory behind RK4 and Verlet}
+    \begin{tabbed}
+        Lecture notes section 8:\\
+        \url{http://www.uio.no/studier/emner/matnat/fys/FYS3150/h14/undervisningsmateriale/Lecture\%20Notes/lecture2014.pdf}
+        Project text:\\
+        \url{http://www.uio.no/studier/emner/matnat/fys/FYS3150/h14/undervisningsmateriale/projects/project-3--deadline-october-20/project3_2014.pdf}
+    \end{tabbed}
+\sectionundertitle{Information on planets}
+    \begin{tabbed}
+        Project Text:\\
+        \url{http://www.uio.no/studier/emner/matnat/fys/FYS3150/h14/undervisningsmateriale/projects/project-3--deadline-october-20/project3_2014.pdf}\\
+        Wikipedia:\\
+        -Sun: \url{http://en.wikipedia.org/wiki/Sun}\\
+        -Mercury: \url{http://en.wikipedia.org/wiki/Mercury_(planet)}\\
+        -Venus: \url{http://en.wikipedia.org/wiki/Venus}\\
+        -Earth: \url{http://en.wikipedia.org/wiki/Earth}\\
+        -Mars: \url{http://en.wikipedia.org/wiki/Mars}\\
+        -Jupiter: \url{http://en.wikipedia.org/wiki/Jupiter}\\
+        -Saturn: \url{http://en.wikipedia.org/wiki/Saturn}\\
+        -Uranus: \url{http://en.wikipedia.org/wiki/Uranus}\\
+        -Neptune: \url{http://en.wikipedia.org/wiki/Neptune}\\
+        -Pluto: \url{http://en.wikipedia.org/wiki/Pluto}
+    \end{tabbed}
+\end{document}

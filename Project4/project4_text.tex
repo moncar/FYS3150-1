@@ -1,0 +1,377 @@
+\documentclass[a4paper,11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{verbatim}
+\usepackage{listings}
+\usepackage[pdftex]{graphicx}
+\usepackage{color}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{fullpage}
+\usepackage[T1]{fontenc}
+\usepackage{cite} % [2,3,4] --> [2--4]
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{caption}
+
+\newcommand{\prtl}{\partial}
+\newcommand{\vsp}{\vspace{0.2cm}}
+\newcommand{\secti}[1]{\begin{center} \Large\bf{{#1}} \end{center}}
+\newcommand{\bigO}{\mathcal{O}}
+
+\newcount\dotcnt\newdimen\deltay
+\def\Ddot#1#2(#3,#4,#5,#6){\deltay=#6\setbox1=\hbox to0pt{\smash{\dotcnt=1
+    \kern#3\loop\raise\dotcnt\deltay\hbox to0pt{\hss#2}\kern#5\ifnum\dotcnt<#1
+\advance\dotcnt 1\repeat}\hss}\setbox2=\vtop{\box1}\ht2=#4\box2}
+
+\title{FYS3150 - Project 4}
+\author{Alfred Alocias Mariadason}
+\date{10.11.2014}
+
+\begin{document}
+\maketitle
+    
+\secti{Introduction}
+    The aim of this project if mainly to solve the one-dimensional diffusion equation, that is, find a closed-form solution and solve it numerically with implicit numerical methods for partial differential equations.\vsp\\
+    The methods used are the Explicit Forward Euler, Implicit Backward Euler and Implicit Crank-Nicolson Scheme. All the methods are testet up against eachother and the truncation errors are also documented.\vsp\\
+    Link to programs: \url{https://github.com/Oo1Insane1oO/project4}
+
+\secti{Abstract}
+    The reason for solving the diffusion equation is because we want to model the dominant way of transporting signals between neurons in the brain. This is archieved by diffusion of signal molecules called neurotransmitters across the synaptic cleft which seperates the cell membranes of two cells.
+
+\secti{Theory}
+    As mentioned the process of transporting the signal is governed by diffusion. Mathematically we can model this by:
+    \begin{equation*}
+        \frac{\prtl u}{\prtl t} = D\nabla^2 u
+    \end{equation*}
+    Here $u$ is the concentration of the particular neurotransmitter(the mentioned molecule). $D$ is the diffusion coefficient determined by the solvent in the synaptic cleft, so $D$ is a coeffecient which changes by environment.\vsp\\
+    To make this problem easier we can make some assumptions.
+        \begin{itemize}
+            \item 1.) The neurotransmitters are released roughly equally.
+            \item 2.) The synaptic cleft if roughly equally wide across its whole.
+        \end{itemize}
+    With these assumptions we can assume that the neurotransmitter concentration only varies in one direction, from presynaptic to postsynaptic. We can choose this to be our x-direction and the diffusion equation reduces to:
+    \begin{equation*}
+        \frac{\prtl u}{\prtl t} = D\frac{\prtl^2 u}{\prtl x^2}
+    \end{equation*}
+    Now, in a real diffusion process the neurotransmitters will occacionally bump into the presynaptic cleft and be absorbed(temporally) by the receptor at the postsynaptic cleft. This imposes following boundary and initial conditions:
+    \begin{equation*}
+        u(x=0,t>0)=u_0,\; u(x=d,\mbox{all $t$})=0,\; u(0<x<d, t<0)=0
+    \end{equation*}
+    With this the solution to the process is given by:
+    \begin{equation*}
+        \frac{\prtl^2 u(x,t)}{\prtl x^2} = \frac{\prtl u(x,t)}{\prtl t},\; t>0,\; x\in [0,d]
+    \end{equation*}
+    The initial conditions are given by:
+    \begin{equation*}
+        u(x,0) = 0,\;\; 0<x<d
+    \end{equation*}
+    And the boundary conditions are:
+    \begin{align*}
+        u(0,t) &= 1,\;\; t>0\\
+        u(d,t) &= 0,\;\; t>0
+    \end{align*}
+
+\secti{Closed-form Solution}
+    For the closed-form solution we can start by looking at the differential equation itself:
+    \begin{equation*}
+        \frac{\prtl^2 u(x,t)}{\prtl x^2} = \frac{\prtl u(x,t)}{\prtl t}
+    \end{equation*}
+    The steady-state solution is given, by the above boundary conditions, as a linear expression:
+    \begin{equation*}
+        u_s(x) = 1 - x
+    \end{equation*}
+    With this we can make a new function $v(x,t)$ and solve for $v$ rather than $u$:
+    \begin{equation*}
+        v(x,t) = u(x,t) - u_s(x) = u(x,t) + x - 1
+    \end{equation*}
+    The boundary conditions for $v$ is:
+    \begin{equation*}
+        v(0) = v(d) = 0
+    \end{equation*}
+    Assuming a form of seperable variable($v(x,t) = F(x)G(t)$) we have that:
+    \begin{equation*}
+        F(x) = A\cos{kx} + B\sin{kx},\; G(t) = Ce^{-k^2 t}
+    \end{equation*}
+    The coefficient A, B and C can be found by the boundary conditions.
+    \begin{equation*}
+        v(x,t) = 0 \Rightarrow (A\cos{kx}+B\sin{kx})C = 0
+    \end{equation*}
+    We observe that $A=0$, $C=1$, and $k=\frac{n\pi}{d}$ fulfills the boundary conditions, however B now has $n$ possibilities and we have:
+    \begin{equation*}
+        v(x,t) = \sum_{n=1}^{\infty}B_n\sin{\bigg(\frac{n\pi}{d}x\bigg)}e^{-\frac{n^2\pi^2}{d^2}t}
+    \end{equation*}
+    The initial conditions for $v$ gives:
+    \begin{equation*}
+        v(x,0) = \sum_{n=1}^{\infty}B_n\sin{\bigg(\frac{n\pi}{d}x\bigg)}
+    \end{equation*}
+    To solve this we can use theory on Fourier series and obtain $B_n$. $B_n$ is then given as the coefficent of the function $(x-1)$:
+    \begin{align*}
+        B_n &= \frac{2}{d}\int\limits_0^d(x-1)\sin{\bigg(\frac{n\pi}{d}x\bigg)}dx\\
+        &= \frac{2}{d}\int\limits_0^d\sin{\bigg(\frac{n\pi}{d}x\bigg)}dx + \frac{2}{d}\int\limits_0^d-\sin{\bigg(\frac{n\pi}{d}x\bigg)}dx
+        \intertext{Integration by parts gives:}
+        B_n &= \frac{2}{d}\bigg[-x\frac{d}{n\pi}\cos{\bigg(\frac{n\pi}{d}x\bigg)}\\ 
+        &+ \int\frac{d}{n\pi}\cos{\bigg(\frac{n\pi}{d}x\bigg)}dx\bigg]_0^d + \frac{2}{d}\bigg[\frac{d}{n\pi}\cos{\bigg(\frac{n\pi}{d}x\bigg)}\bigg]_0^d\\
+        &= -\frac{2d}{n\pi}\cos{(n\pi)} + \frac{2}{d}\sin{(n\pi)} + \frac{2}{n\pi}\\
+        &= -\frac{2d}{n\pi}\cos{(n\pi)} + \frac{2}{d}\sin{(n\pi)} + \frac{2}{n\pi}\cos{(n\pi)} - \frac{2}{n\pi}
+        \intertext{Since $n=1,2,\dots$, we have that $\sin{(n\pi)}=0$ and $\cos{(n\pi)}=(-1)^n$.}
+        B_n &= -\frac{2d}{n\pi}(-1)^n + \frac{2}{n\pi}(-1)^n - \frac{2}{n\pi}\\
+        B_n &= \frac{2}{n\pi}((-1)^n(1-d)-1)
+        \intertext{For our case $d=1$, which gives:}
+        B_n &= -\frac{2}{n\pi}
+    \end{align*}
+    So the closed-form solution is:
+    \begin{equation*}
+        v(x,t) = \frac{2}{\pi}\sum_{n=1}^{\infty}\frac{1}{n}((-1)^n(1-d)-1)\sin{\bigg(\frac{n\pi}{d}x\bigg)}e^{-\frac{n^2\pi^2}{d^2}t}
+    \end{equation*}
+    And for $d=1$ we have:
+    \begin{equation*}
+        v(x,t) = -\frac{2}{\pi}\sum_{n=1}^{\infty}\frac{1}{n}\sin{(n\pi)}e^{-n^2\pi^2 t}
+    \end{equation*}
+
+\secti{Explicit Forward Euler}
+    For the explicit method we approximate the function slope with a forward formula:
+    \begin{align*}
+        \frac{\prtl u}{\prtl t} &= \frac{u(x,t+\Delta t) - u(x,t)}{\Delta t}\\
+        \frac{\prtl^2 u}{\prtl x^2} &= \frac{u(x+\Delta x,t) - 2u(x,t) + u(x-\Delta x,t)}{\Delta x^2}
+    \end{align*}
+    And discretized we have:
+    \begin{align*}
+        u_t &= \frac{u(x_i,t_{j+1}) - u(x_i,t_j)}{\Delta t} = \frac{u_{i,j+1} - u_{i,j}}{\Delta t}\\
+        u_{xx} &= \frac{u(x_{i+1},t_j) - 2u(x_i,t_j) + u(x_{i-1},t_j)}{\Delta x^2} = \frac{u_{i+1,j} - 2u_{i,j} + u_{i-1,j}}{\Delta x^2}
+    \end{align*}
+    So the diffusion equation becomes:
+    \begin{align*}
+        \frac{u_{i+1,j} - 2u_{i,j} + u_{i-1,j}}{\Delta x^2} &= \frac{u_{i,j+1} - u_{i,j}}{\Delta t}
+    \end{align*}
+    Further we can assign $\frac{\Delta t}{\Delta x^2}$ to a variable, for instance $\alpha = \frac{\Delta t}{\Delta x^2}$. This basically rearranges the equation such that the advancement of the time-step is on the left side giving the final discretized expression:
+    \begin{equation*}
+        u_{i,j+1} = \alpha u_{i+1,j} + (1-2\alpha)u_{i,j} + \alpha u_{i-1,j}
+    \end{equation*}
+    Note that we can express this on matrix form with a tridiagonal matrix with the factors $\alpha$ alongs its upper and lower diagonal and $1-2\alpha$ along its diagonal. A linear matrix expression is much more convenient when we study the stability of the scheme as predicated belove.\vsp\\
+
+
+\secti{Implicit Backward Euler}
+    For the implicit scheme we use the backward formula(rather than the forward formula used above) to arrive at our solution.
+    \begin{align*}
+        \frac{\prtl u}{\prtl t} &= \frac{u_{i,j} - u_{i,j-1}}{\Delta t}\\
+        \frac{\prtl^2 u}{\prtl x^2} &= \frac{u_{i+1,j} - 2u_{i,j} + u_{i-1,j}}{\Delta x^2}
+    \end{align*}
+    Using the same $\alpha$ as above $(\alpha = \frac{\Delta t}{\Delta x^2})$ we arrive at a discretized scheme with the function value at previous time-step as the only unknown:
+    \begin{equation*}
+        u_{i,j-1} = -\alpha u_{i-1,j} + (1-2\alpha )u_{i,j} - \alpha u_{i+1,j}
+    \end{equation*}
+    We observe that this can be expressed in form of a linear system like this:
+    \begin{align*}
+        V_j &= 
+        \begin{bmatrix}
+            u_{1,j}\\
+            \vdots\\
+            u_{n,j}
+        \end{bmatrix} \Rightarrow
+        V_{j} = (I+\alpha A)^{-1}V_{j-1}\\
+        \intertext{Where:}
+        A &= 
+        \begin{bmatrix}
+            \begin{matrix}
+                2 & -1 & \\
+                -1 & 2 & -1\\
+                & -1 & 2
+            \end{matrix} 
+            & & & & & \text{\Huge 0}\\ &
+            \begin{matrix}
+                & & \Ddot{8}.(0pt,10pt,6pt,-4.5pt)\\
+                & \Ddot{8}.(0pt,10pt,6pt,-4.5pt)\\
+                \Ddot{8}.(0pt,10pt,6pt,-4.5pt) & &
+            \end{matrix} &\\
+            \\ \text{\Huge 0} & & & & &
+            \begin{matrix}
+                2 & -1 & \\
+                -1 & 2 & -1\\
+                  & -1 & 2
+            \end{matrix}
+        \end{bmatrix}
+    \end{align*}
+    And now we can just use a tridiagonal solver(like the one from project 1) to integrate the equation through time and obtain the appoximated solution.
+
+\secti{Implicit Crank-Nicolson Scheme}
+    The Crank-Nicolson Scheme is a combination of the two above schemes, the algorithm is as follows:
+    \begin{align*}
+        \frac{\prtl u}{\prtl t} &= \frac{u_{i,j+1} - u_{i,j}}{\Delta t}\\
+        \frac{\prtl^2 u}{\prtl x^2} &= \frac{u_{i+1,j} - 2u_{i,j} + u_{i-1,j}}{2 \Delta x^2} + \frac{u_{i+1,j+1} - 2u_{i,j+1} + u_{i-1,j+1}}{2 \Delta x^2}
+    \end{align*}
+    Note that this is a time-centered scheme with $t+\Delta t/2$ as center.\vsp\\
+    Again we define the same $\alpha =\frac{\Delta t}{\Delta x^2}$ as previously and rearrange the equation. The discretized equation yields:
+    \begin{equation*}
+        -\alpha u_{i-1,j}+(2+2\alpha)u_{i,j} - \alpha u_{i+1,j} = \alpha u_{i-1,j-1} + (2-2\alpha)u_{i,j-1} + \alpha u_{i+1,j-1}
+    \end{equation*}
+    This can also be expressed in matrix form as:
+    \begin{equation*}
+        (2I + \alpha A)V_j = (2I - \alpha A)V_{j-1}
+    \end{equation*}
+    Vector $V_J$ is the same as in the implicit scheme and matrix $A$ is the same as above.
+    We can rewrite this as follows:
+    \begin{equation*}
+        V_j = (2I + \alpha A)^{-1}(2I - \alpha A)V_{j-1}
+    \end{equation*}
+
+\secti{Truncation errors:}
+    The truncation error of both the implicit and explicit schemes can be expressed with the remainder in a Taylor expansion(or Taylor polynomial). It is simple to convince ourselves that the truncation error of Backward Euler is the same as Forward Euler so only the Forward scheme will expressed here. Now we Taylor expand the three parts of the explicit scheme and get:
+    \begin{align*}
+        u(x,t+\Delta t) &= u(x,t) + \frac{\prtl u(x,t)}{\prtl t}\Delta t + \bigO(\Delta t^2)\\
+        u(x+\Delta x,t) &= u(x,t) + \frac{\prtl u(x,t)}{\prtl x}\Delta x + \frac{\prtl^2 u(x,t)}{2\prtl x^2}\Delta x^2 + \bigO(\Delta x^3)\\
+        u(x-\Delta x,t) &= u(x,t) - \frac{\prtl u(x,t)}{\prtl x}\Delta x + \frac{\prtl^2 (x,t)}{2\prtl x^2}\Delta x^2 + \bigO(\Delta x^3)
+        \intertext{Which gives:}
+        \frac{\prtl u(x,t)}{\prtl t} &= \frac{u(x,t+\Delta t) - u(x,t)}{\Delta t} + \bigO(\Delta t)\\
+        \frac{\prtl u(x,t)}{\prtl x^2} &= \frac{u(x+\Delta x,t) + 2u(x,t) + u(x-\Delta x,t)}{\Delta x^2} + \bigO(\Delta x^2) 
+    \end{align*}
+    Summing this gives that the truncation error for both the Forward and Backward scheme the truncation error is:
+    \begin{equation*}
+        \bigO(\Delta t, \Delta x^2)
+    \end{equation*}
+    For the Crank-Nicolson scheme we proceed in the same way as above, but with the expansion centered at $t+\Delta t/2$. Using the expansions above and solving the expansions for $u(x+\Delta x,t+\Delta t)$ and $u(x-\Delta x,t+\Delta t)$ at $t+\Delta t/2$ we get:
+    \begin{align*}
+        \bigg[\frac{\prtl u(x,t+\Delta t/2)}{\prtl t}\bigg]_{approx} &= \frac{\prtl u(x,t+\Delta t/2)}{\prtl t} + \bigO(\Delta t^2)\\
+        \bigg[\frac{\prtl^2 u(x,t+\Delta t/2)}{\prtl x^2}\bigg]_{approx} &= \frac{\prtl^2 u(x,t+\Delta t/2)}{\prtl x^2} + \bigO(\Delta x^2)
+    \end{align*}
+    Which gives a summed truncation error of:
+    \begin{equation*}
+        \bigO(\Delta t^2,\Delta x^2)
+    \end{equation*}
+
+\secti{Stability Conditions}
+    The stability condition for the explicit scheme is given by:
+    \begin{equation*}
+        \frac{\Delta t}{\Delta x^2} \leq \frac{1}{2}
+    \end{equation*}
+    This basically means that a low $\Delta x$ gives a very low $\Delta t$ which will obviously give unwanted consequences if the chosen time-intervall is large. We can study this scheme by requiring that the solution approches a definite value as we increase our time-step. This means that by theory on iterative schemes we require the spectral radius of our matrix to satisfy the following condition:
+    \begin{equation*}
+        \rho(A) < 1
+    \end{equation*}
+    The spectral radius is essentially interpreted as the smallest number such that a circle with radius centered at origin of the complex plane contains all eigenvalues of $A$. Note that if $A$ is positive-definite the above condition is always satisfy.\vsp\\
+    If we want to we can solve the eigenvalues of $A$ and use those to find the conditions defined by the spectral radius. In order to do this we can start of by expressing $A$ in terms of a matrix $B$ defined by the coefficients of the element of $A$ we get that $A$ can be expressed as:
+    \begin{equation*}
+        A = I - \alpha B
+    \end{equation*}
+    The eigenvalues of A is then given as:
+    \begin{equation*}
+        \lambda_i = 1 - \alpha \mu_i
+    \end{equation*}
+    Where $\mu_i$ is the eigenvalues of $B$. Using the fact that the elements of $B$ can be expressed as:
+    \begin{equation*}
+        b_{ij} = 2\delta_{ij} - \delta_{i+1j} - \delta_{i-1j}
+    \end{equation*}
+    We can now find the eigenvalues of $B$ with the set of eigenequations:
+    \begin{equation*}
+        (Bx)_i = \mu_i x_i
+    \end{equation*}
+    If we now assume that $x$ can be expanded in a basis of $x=\sin{(n\theta)}$ with $\theta =l\pi/n+1$ and the endpoints are zero. The set can then be rewritten as:
+    \begin{equation*}
+        2\sin{i\theta} - \sin{((i+1)\theta)} - \sin{((i-1)\theta)} = \mu_i\sin{(i\theta)}\\
+    \end{equation*}
+    \begin{equation*}
+        2(1-\cos{(\theta)})x_i = \mu_i x_i
+    \end{equation*}
+    \begin{equation*}
+        \mu_i = 2(1-\cos{(\theta)})
+    \end{equation*}
+    With the required condition defined by the spectral radius above we have that $\alpha$ must have the following conditions:
+    \begin{equation*}
+        -1 < 1-2\alpha (1-\cos{(\theta)}) < 1
+    \end{equation*}
+    \begin{equation*}
+        \alpha < \frac{1}{(1-\cos{(\theta)})}
+    \end{equation*}
+    Which results in:
+    \begin{equation*}
+        \alpha \leq \frac{1}{2} \Rightarrow \frac{\Delta t}{\Delta x^2} \leq \frac{1}{2}
+    \end{equation*}
+    As mentioned above, if the matrix at hand is positive-definite the condition given by the spectral radius, $\rho(A)<1$ is always satisfied. Thid basically means that all the eigenvalues are positive. It is easy to convince ourselves that this is true for the Implicit Backward scheme since $A=I+\alpha B$ gives eigenvalues $\lambda_i = 1+2\alpha (1-\cos{(\theta)})>1$ and since we use the inverse we have that $\rho(A^{-1}) < 1$ and the methods is always stable.\vsp\\
+    The same argument of stability goes for the Implicit Crank-Nicolson scheme. The essential part is that we get:
+    \begin{equation*}
+        \rho((2I+\alpha A)^{-1}(2I+\alpha A)) < 1
+    \end{equation*}
+    From:
+    \begin{equation*}
+        \bigg|(2+\alpha\mu_i)^{-1}(2-\alpha\mu_i)\bigg| < 1
+    \end{equation*}
+\newpage
+\secti{Results}
+    Using the programs mentioned in the introduction section above the results of the implementations of these three schemes are as follows:\vsp\\
+    \begin{figure}[H]
+        \centering
+        \text{\bf{Explicit Forward Euler Scheme at different times}}\\
+        \includegraphics[scale=0.6]{EE_1.png}
+        \caption*{dx=0.01, dt=0.00005}
+    \end{figure}
+    \begin{figure}[H]
+        \centering
+        \text{\bf{Implicit Backward Euler Scheme at different times}}\\
+        \includegraphics[scale=0.6]{IE_1.png}
+        \caption*{dx=0.01, dt=0.00005}
+    \end{figure}
+    \begin{figure}[H]
+        \centering
+        \text{\bf{Implicit Crank-Nicolson Scheme at different times}}\\
+        \includegraphics[scale=0.6]{CN_1.png}
+        \caption*{dx=0.01, dt=0.00005}
+    \end{figure}
+    In order to test the schemes we run the simulations with a $dx=0.1$.
+    \begin{figure}[H]
+        \centering
+        \text{\bf{Error-estimate Explicit Forward Euler Scheme}}\\
+        \includegraphics[scale=0.6]{EE_stab_1.png}
+        \caption*{dx=0.1, dt=0.00005}
+    \end{figure}
+    \begin{figure}[H]
+        \centering
+        \text{\bf{Error-estimate Implicit Backward Euler Scheme}}\\
+        \includegraphics[scale=0.6]{IE_stab_1.png}
+        \caption*{dx=0.1, dt=0.00005}
+    \end{figure}
+    \begin{figure}[H]
+        \centering
+        \text{\bf{Error-estimate Implicit Crank-Nicolson Scheme}}\\
+        \includegraphics[scale=0.6]{CN_stab_1.png}
+        \caption*{dx=0.1, dt=0.00005}
+    \end{figure}
+    \begin{figure}[H]
+        \centering
+        \text{\bf{Stability test Explicit Forward Euler Scheme}}\\
+        \includegraphics[scale=0.6]{EE_stab_3.png}
+        \caption*{dx=0.1, dt=0.005}
+    \end{figure}
+    \begin{figure}[H]
+        \centering
+        \text{\bf{Stability test Implicit Backward Euler Scheme}}\\
+        \includegraphics[scale=0.6]{IE_stab_3.png}
+        \caption*{dx=0.1, dt=0.005}
+    \end{figure}
+    \begin{figure}[H]
+        \centering
+        \text{\bf{Stability test Implicit Crank-Nicolson Scheme}}\\
+        \includegraphics[scale=0.6]{CN_stab_3.png}
+        \caption*{dx=0.1, dt=0.005}
+    \end{figure}
+    As we can see the forward scheme is a bit unstable when the stability condition is at its limit(see stability section above).\vsp\\
+    Here are some comparison plots with the closed-form result:
+    \begin{figure}[H]
+        \centering
+        \text{\bf{Explicit Forward Euler}}\\
+        \includegraphics[scale=0.6]{EE_comp.png}
+        \caption*{dx=0.01, dt=0.005}
+    \end{figure}G
+    \begin{figure}[H]
+        \centering
+        \text{\bf{Implicit Backward Euler}}\\
+        \includegraphics[scale=0.6]{IE_comp.png}
+        \caption*{dx=0.01, dt=0.005}
+    \end{figure}
+    \begin{figure}[H]
+        \centering
+        \text{\bf{Implicit Crank-Nicolson}}\\
+        \includegraphics[scale=0.6]{CN_comp.png}
+        \caption*{dx=0.01, dt=0.005}
+    \end{figure}
+    Considering the stability properties and the truncation errors found in respective sections above and the resulting plots as seen above, one would classify the Implicit Backward scheme as the best. However for the problem at hand there aren't any significant problems with the Crank-Nicolson scheme.
+\end{document}
